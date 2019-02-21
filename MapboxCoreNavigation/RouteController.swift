@@ -24,7 +24,8 @@ open class RouteController: NSObject {
         public static let shouldDisableBatteryMonitoring: Bool = true
     }
     
-    let navigator = MBNavigator()
+    // :nodoc: temporarily exposed for testing purposes
+    public let navigator = MBNavigator()
     
     public var route: Route {
         get {
