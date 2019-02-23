@@ -230,8 +230,10 @@ open class RouteController: NSObject {
         if willChangeVisualIndex || isFirstLocation {
             let currentStepProgress = routeProgress.currentLegProgress.currentStepProgress
             currentStepProgress.visualInstructionIndex = Int(status.bannerInstruction?.index ?? 0)
-            let instruction = currentStepProgress.currentVisualInstruction
-            announcePassage(of: instruction!, routeProgress: routeProgress)
+            
+            if let instruction = currentStepProgress.currentVisualInstruction {
+                announcePassage(of: instruction, routeProgress: routeProgress)
+            }
         }
     }
     
@@ -259,7 +261,11 @@ open class RouteController: NSObject {
                 let advancesToNextLeg = delegate?.router?(self, didArriveAt: currentDestination) ?? DefaultBehavior.didArriveAtWaypoint
                 guard !routeProgress.isFinalLeg && advancesToNextLeg else { return }
                 
-                routeProgress.legIndex = Int(status.legIndex)
+                if advancesToNextLeg {
+                    let legIndex = status.legIndex + 1
+                    navigator.changeRouteLeg(forRoute: 0, leg: legIndex)
+                    routeProgress.legIndex = Int(legIndex)
+                }
             }
         }
     }
@@ -338,6 +344,14 @@ open class RouteController: NSObject {
         ]
         
         NotificationCenter.default.post(name: .routeControllerDidPassVisualInstructionPoint, object: self, userInfo: info)
+    }
+    
+    /**
+     Returns an estimated location at a given timestamp. The timestamp must be
+     a future timestamp compared to the last location received by the location manager.
+     */
+    public func projectedLocation(for timestamp: Date) -> CLLocation {
+        return CLLocation(navigator.getStatusForTimestamp(timestamp).location)
     }
     
     public func advanceLegIndex(location: CLLocation) {

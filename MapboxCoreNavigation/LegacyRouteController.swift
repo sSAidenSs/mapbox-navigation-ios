@@ -79,6 +79,8 @@ open class LegacyRouteController: NSObject, Router, CLLocationManagerDelegate {
     var movementsAwayFromRoute = 0
 
     var previousArrivalWaypoint: Waypoint?
+    
+    var isFirstLocation: Bool = true
 
     var userSnapToStepDistanceFromManeuver: CLLocationDistance?
     
@@ -131,6 +133,9 @@ open class LegacyRouteController: NSObject, Router, CLLocationManagerDelegate {
      */
     var rawLocation: CLLocation? {
         didSet {
+            if isFirstLocation == true {
+                isFirstLocation = false
+            }
             updateDistanceToManeuver()
         }
     }
@@ -521,7 +526,6 @@ open class LegacyRouteController: NSObject, Router, CLLocationManagerDelegate {
         if let upcomingStep = routeProgress.currentLegProgress.upcomingStep, let finalHeading = upcomingStep.finalHeading, let initialHeading = upcomingStep.initialHeading {
             let initialHeadingNormalized = initialHeading.wrap(min: 0, max: 360)
             let finalHeadingNormalized = finalHeading.wrap(min: 0, max: 360)
-            let userHeadingNormalized = location.course.wrap(min: 0, max: 360)
             let expectedTurningAngle = initialHeadingNormalized.difference(from: finalHeadingNormalized)
 
             // If the upcoming maneuver is fairly straight,
@@ -532,7 +536,8 @@ open class LegacyRouteController: NSObject, Router, CLLocationManagerDelegate {
             // Once this distance is zero, they are at more moving away from the maneuver location
             if expectedTurningAngle <= RouteControllerMaximumAllowedDegreeOffsetForTurnCompletion {
                 courseMatchesManeuverFinalHeading = userSnapToStepDistanceFromManeuver == 0
-            } else {
+            } else if location.course.isQualified {
+                let userHeadingNormalized = location.course.wrap(min: 0, max: 360)
                 courseMatchesManeuverFinalHeading = finalHeadingNormalized.difference(from: userHeadingNormalized) <= RouteControllerMaximumAllowedDegreeOffsetForTurnCompletion
             }
         }
@@ -571,18 +576,18 @@ open class LegacyRouteController: NSObject, Router, CLLocationManagerDelegate {
     
     func updateVisualInstructionProgress() {
         guard let userSnapToStepDistanceFromManeuver = userSnapToStepDistanceFromManeuver else { return }
-        guard let visualInstructions = routeProgress.currentLegProgress.currentStepProgress.remainingVisualInstructions else { return }
-        
-        let firstInstructionOnFirstStep = routeProgress.currentLegProgress.stepIndex == 0 && routeProgress.currentLegProgress.currentStepProgress.visualInstructionIndex == 0
+        let currentStepProgress = routeProgress.currentLegProgress.currentStepProgress
+        guard let visualInstructions = currentStepProgress.remainingVisualInstructions else { return }
         
         for visualInstruction in visualInstructions {
-            if userSnapToStepDistanceFromManeuver <= visualInstruction.distanceAlongStep || firstInstructionOnFirstStep {
-                
+            if userSnapToStepDistanceFromManeuver <= visualInstruction.distanceAlongStep || isFirstLocation {
+                let currentVisualInstruction = currentStepProgress.currentVisualInstruction!
+                delegate?.router?(self, didPassVisualInstructionPoint: currentVisualInstruction, routeProgress: routeProgress)
                 NotificationCenter.default.post(name: .routeControllerDidPassVisualInstructionPoint, object: self, userInfo: [
-                    RouteControllerNotificationUserInfoKey.routeProgressKey: routeProgress
-                    ])
-                
-                routeProgress.currentLegProgress.currentStepProgress.visualInstructionIndex += 1
+                    RouteControllerNotificationUserInfoKey.routeProgressKey: routeProgress,
+                    RouteControllerNotificationUserInfoKey.visualInstructionKey: currentVisualInstruction,
+                ])
+                currentStepProgress.visualInstructionIndex += 1
                 return
             }
         }
