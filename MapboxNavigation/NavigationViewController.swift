@@ -301,7 +301,7 @@ open class NavigationViewController: UIViewController {
     
     // MARK: Route controller notifications
     
-    func scheduleLocalNotification(about step: RouteStep, legIndex: Int?, numberOfLegs: Int?) {
+    func scheduleLocalNotification(about step: RouteStep) {
         guard sendsNotifications else { return }
         guard UIApplication.shared.applicationState == .background else { return }
         guard let text = step.instructionsSpokenAlongStep?.last?.text else { return }
@@ -503,7 +503,7 @@ extension NavigationViewController: NavigationServiceDelegate {
         clearStaleNotifications()
         
         if routeProgress.currentLegProgress.currentStepProgress.durationRemaining <= RouteControllerHighAlertInterval {
-            scheduleLocalNotification(about: routeProgress.currentLegProgress.currentStep, legIndex: routeProgress.legIndex, numberOfLegs: routeProgress.route.legs.count)
+            scheduleLocalNotification(about: routeProgress.currentLegProgress.currentStep)
         }
     }
     
